@@ -400,9 +400,9 @@ class FileStore(AbstractStore):
         return self._get_run_from_info(run_info)
 
     def _get_run_from_info(self, run_info):
-        metrics = self.get_all_metrics(run_info.run_uuid)
-        params = self.get_all_params(run_info.run_uuid)
-        tags = self.get_all_tags(run_info.run_uuid)
+        metrics = self._get_all_metrics(run_info)
+        params = self._get_all_params(run_info)
+        tags = self._get_all_tags(run_info)
         return Run(run_info, RunData(metrics, params, tags))
 
     def _get_run_info(self, run_uuid):
@@ -426,9 +426,7 @@ class FileStore(AbstractStore):
             return None
         return run_info
 
-    def _get_run_files(self, run_uuid, resource_type):
-        _validate_run_id(run_uuid)
-        run_info = self._get_run_info(run_uuid)
+    def _get_run_files(self, run_info, resource_type):
         if run_info is None:
             raise MlflowException("Run '%s' metadata is in invalid state." % run_uuid,
                                   databricks_pb2.INVALID_STATE)
@@ -483,7 +481,11 @@ class FileStore(AbstractStore):
 
     def get_all_metrics(self, run_uuid):
         _validate_run_id(run_uuid)
-        parent_path, metric_files = self._get_run_files(run_uuid, "metric")
+        run_info = self._get_run_info(run_uuid)
+        return self._get_all_metrics(run_info)
+
+    def _get_all_metrics(self, run_info):
+        parent_path, metric_files = self._get_run_files(run_info, "metric")
         metrics = []
         for metric_file in metric_files:
             metrics.append(self._get_metric_from_file(parent_path, metric_file))
@@ -504,7 +506,11 @@ class FileStore(AbstractStore):
     def get_metric_history(self, run_id, metric_key):
         _validate_run_id(run_id)
         _validate_metric_name(metric_key)
-        parent_path, metric_files = self._get_run_files(run_id, "metric")
+        run_info = self._get_run_info(run_id)
+        return self._get_metric_history(run_info, metric_key)
+
+    def _get_metric_history(self, run_info, metric_key):
+        parent_path, metric_files = self._get_run_files(run_info, "metric")
         if metric_key not in metric_files:
             raise MlflowException("Metric '%s' not found under run '%s'" % (metric_key, run_id),
                                   databricks_pb2.RESOURCE_DOES_NOT_EXIST)
@@ -524,7 +530,12 @@ class FileStore(AbstractStore):
         return Param(param_name, value)
 
     def get_all_params(self, run_uuid):
-        parent_path, param_files = self._get_run_files(run_uuid, "param")
+        _validate_run_id(run_uuid)
+        run_info = self._get_run_info(run_uuid)
+        return self._get_all_params(run_info)
+
+    def _get_all_params(self, run_info):
+        parent_path, param_files = self._get_run_files(run_info, "param")
         params = []
         for param_file in param_files:
             params.append(self._get_param_from_file(parent_path, param_file))
@@ -550,7 +561,12 @@ class FileStore(AbstractStore):
         return RunTag(tag_name, tag_data)
 
     def get_all_tags(self, run_uuid):
-        parent_path, tag_files = self._get_run_files(run_uuid, "tag")
+        _validate_run_id(run_uuid)
+        run_info = self._get_run_info(run_uuid)
+        return self._get_all_tags(run_info)
+
+    def _get_all_tags(self, run_info):
+        parent_path, tag_files = self._get_run_files(run_info, "tag")
         tags = []
         for tag_file in tag_files:
             tags.append(self._get_tag_from_file(parent_path, tag_file))
